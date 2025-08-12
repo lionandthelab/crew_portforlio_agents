@@ -1,0 +1,30 @@
+rebalance: "quarterly"
+max_names: 12
+max_weight_per_name: 0.15
+max_weight_per_sector: 0.30
+long_only: true
+gross_leverage: 1.0
+turnover_target: 0.25
+transaction_cost_bps: 10
+slippage_bps: 5
+risk_free_rate: 0.0
+
+exclusions:
+  blacklist_tickers: []
+  esg_flags: []
+  min_median_dollar_vol: 1e6
+
+position_limits:
+  sector_caps:
+    Technology: 0.40
+    Financials: 0.35
+    Energy: 0.35
+    Health Care: 0.35
+    Consumer Discretionary: 0.35
+  ticker_caps: {}
+
+factors:
+  momentum_252d: {weight: 0.40}
+  value_pe_inv:  {weight: 0.20}
+  quality_roa:   {weight: 0.20}
+  low_vol_63d:   {weight: 0.20}
