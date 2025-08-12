@@ -22,11 +22,12 @@ class GetMarketDataTool(BaseTool):
 
     def _run(self, start: str, end: str) -> str:
         try:
-            prices = load_prices()
-            fundamentals = load_fundamentals()
-
-            # Filter by date range
-            prices = prices[(prices["date"] >= start) & (prices["date"] <= end)].copy()
+            prices = load_prices(start, end, use_real_data=True)
+            fundamentals = load_fundamentals(start, end, use_real_data=True)
+            
+            # Filter by date range (if using mock data)
+            if len(prices) > 0 and prices["date"].min() < pd.to_datetime(start):
+                prices = prices[(prices["date"] >= start) & (prices["date"] <= end)].copy()
 
             # Get unique tickers and sectors
             tickers = prices["ticker"].unique()
@@ -62,11 +63,12 @@ class ComputeFactorSignalsTool(BaseTool):
     def _run(self, start: str, end: str) -> str:
         try:
             cfg = self._load_config()
-            prices = load_prices()
-            fundamentals = load_fundamentals()
+            prices = load_prices(start, end, use_real_data=True)
+            fundamentals = load_fundamentals(start, end, use_real_data=True)
 
             # Filter by date range
-            prices = prices[(prices["date"] >= start) & (prices["date"] <= end)].copy()
+            if len(prices) > 0 and prices["date"].min() < pd.to_datetime(start):
+                prices = prices[(prices["date"] >= start) & (prices["date"] <= end)].copy()
 
             # Compute signals
             scores = compute_signals(prices, fundamentals, cfg)
@@ -118,9 +120,12 @@ class BuildPortfolioTool(BaseTool):
             end = config.get("end", "2024-12-31")
             cfg = self._load_config()
 
-            prices = load_prices()
-            fundamentals = load_fundamentals()
-            prices = prices[(prices["date"] >= start) & (prices["date"] <= end)].copy()
+            prices = load_prices(start, end, use_real_data=True)
+            fundamentals = load_fundamentals(start, end, use_real_data=True)
+            
+            # Filter by date range (if using mock data)
+            if len(prices) > 0 and prices["date"].min() < pd.to_datetime(start):
+                prices = prices[(prices["date"] >= start) & (prices["date"] <= end)].copy()
 
             # Compute signals
             scores = compute_signals(prices, fundamentals, cfg)
@@ -203,9 +208,12 @@ class RunCustomBacktestTool(BaseTool):
             end = config.get("end", "2024-12-31")
             cfg = self._load_config()
 
-            prices = load_prices()
-            fundamentals = load_fundamentals()
-            prices = prices[(prices["date"] >= start) & (prices["date"] <= end)].copy()
+            prices = load_prices(start, end, use_real_data=True)
+            fundamentals = load_fundamentals(start, end, use_real_data=True)
+            
+            # Filter by date range (if using mock data)
+            if len(prices) > 0 and prices["date"].min() < pd.to_datetime(start):
+                prices = prices[(prices["date"] >= start) & (prices["date"] <= end)].copy()
 
             # Compute signals
             scores = compute_signals(prices, fundamentals, cfg)
