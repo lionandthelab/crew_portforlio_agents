@@ -1,0 +1,13 @@
+{
+  "download_date": "2025-08-12T21:00:53.088800",
+  "start_date": "2020-01-01",
+  "end_date": "2025-07-31",
+  "output_directory": "data/downloaded/",
+  "symbols": null,
+  "use_mock_data": false,
+  "files_downloaded": {
+    "prices": "data/downloaded/prices.csv",
+    "fundamentals": "data/downloaded/fundamentals.csv",
+    "summary": "data/downloaded/download_summary.json"
+  }
+}

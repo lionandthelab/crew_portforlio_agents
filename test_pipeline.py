@@ -26,7 +26,7 @@ def test_mock_data():
     logger.info("=== Testing with Mock Data ===")
 
     try:
-        result = run_pipeline(start="2020-01-01", end="2024-12-31", use_real_data=False)
+        result = run_pipeline(start="2020-01-01", end="2025-07-31", use_real_data=False)
         logger.info(f"Mock data test result: {result}")
         return True
     except Exception as e:
@@ -39,7 +39,7 @@ def test_real_data():
     logger.info("=== Testing with Real Data ===")
 
     try:
-        result = run_pipeline(start="2023-01-01", end="2024-12-31", use_real_data=True)
+        result = run_pipeline(start="2023-01-01", end="2025-07-31", use_real_data=True)
         logger.info(f"Real data test result: {result}")
         return True
     except Exception as e:

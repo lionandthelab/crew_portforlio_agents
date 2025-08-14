@@ -24,7 +24,7 @@ def load_cfg() -> Dict[str, Any]:
 
 def load_prices(
     start_date: str = "2020-01-01",
-    end_date: str = "2024-12-31",
+    end_date: str = "2025-07-31",
     use_real_data: bool = True,
 ) -> pd.DataFrame:
     """주가 데이터를 로드합니다."""
@@ -44,7 +44,7 @@ def load_prices(
 
 def load_fundamentals(
     start_date: str = "2020-01-01",
-    end_date: str = "2024-12-31",
+    end_date: str = "2025-07-31",
     use_real_data: bool = True,
 ) -> pd.DataFrame:
     """재무 데이터를 로드합니다."""
@@ -586,4 +586,252 @@ def run_pipeline(start: str, end: str, use_real_data: bool = True) -> str:
 
     except Exception as e:
         logger.error(f"Pipeline failed: {e}")
+        raise
+
+
+def run_backtest(
+    portfolio_path: str,
+    start_date: str,
+    end_date: str,
+    rebalance_frequency: str = "quarterly",
+    transaction_costs: float = 0.001,
+    data_directory: str = "data/downloaded/",
+) -> Dict[str, Any]:
+    """
+    포트폴리오 백테스트를 실행합니다.
+
+    Args:
+        portfolio_path: 포트폴리오 디렉토리 경로
+        start_date: 백테스트 시작 날짜
+        end_date: 백테스트 종료 날짜
+        rebalance_frequency: 리밸런싱 빈도
+        transaction_costs: 거래 비용 (퍼센트)
+        data_directory: 데이터 디렉토리 경로
+
+    Returns:
+        백테스트 결과 딕셔너리
+    """
+    try:
+        logger.info(f"Starting backtest for portfolio: {portfolio_path}")
+        logger.info(f"Period: {start_date} to {end_date}")
+        logger.info(f"Rebalance frequency: {rebalance_frequency}")
+        logger.info(f"Transaction costs: {transaction_costs:.3f}%")
+
+        # 포트폴리오 가중치 로드
+        weights_file = os.path.join(portfolio_path, "weights.csv")
+        if not os.path.exists(weights_file):
+            raise FileNotFoundError(f"Portfolio weights file not found: {weights_file}")
+
+        portfolio_weights = pd.read_csv(weights_file)
+        logger.info(f"Loaded portfolio weights: {portfolio_weights.shape}")
+
+        # 데이터 로드
+        prices_file = os.path.join(data_directory, "prices.csv")
+        if not os.path.exists(prices_file):
+            raise FileNotFoundError(f"Price data not found: {prices_file}")
+
+        # Load prices and ensure proper datetime parsing with timezone handling
+        prices = pd.read_csv(prices_file)
+        prices["date"] = pd.to_datetime(prices["date"], utc=True)
+
+        # Convert string dates to pandas Timestamp objects (timezone-naive)
+        start_date_ts = pd.to_datetime(start_date)
+        end_date_ts = pd.to_datetime(end_date)
+
+        # Convert timezone-aware dates to timezone-naive for comparison
+        if hasattr(prices["date"], "dt") and prices["date"].dt.tz is not None:
+            prices["date"] = prices["date"].dt.tz_localize(None)
+
+        prices = prices[
+            (prices["date"] >= start_date_ts) & (prices["date"] <= end_date_ts)
+        ]
+
+        logger.info(f"Loaded price data: {prices.shape}")
+        logger.info(
+            f"Price date range: {prices['date'].min()} to {prices['date'].max()}"
+        )
+
+        # 백테스트 실행
+        equity_curve, trades, metrics = run_portfolio_backtest(
+            portfolio_weights=portfolio_weights,
+            prices=prices,
+            rebalance_frequency=rebalance_frequency,
+            transaction_costs=transaction_costs,
+        )
+
+        results = {"equity_curve": equity_curve, "trades": trades, "metrics": metrics}
+
+        logger.info("Backtest completed successfully")
+        return results
+
+    except Exception as e:
+        logger.error(f"Backtest failed: {e}")
+        raise
+
+
+def run_portfolio_backtest(
+    portfolio_weights: pd.DataFrame,
+    prices: pd.DataFrame,
+    rebalance_frequency: str = "quarterly",
+    transaction_costs: float = 0.001,
+) -> Tuple[pd.DataFrame, pd.DataFrame, Dict[str, float]]:
+    """
+    포트폴리오 백테스트를 실행합니다.
+
+    Args:
+        portfolio_weights: 포트폴리오 가중치 DataFrame
+        prices: 가격 데이터 DataFrame
+        rebalance_frequency: 리밸런싱 빈도
+        transaction_costs: 거래 비용
+
+    Returns:
+        (수익률 곡선, 거래 내역, 성과 지표)
+    """
+    try:
+        # 가격 데이터 피벗 (중복 처리)
+        # 중복된 데이터가 있는 경우 마지막 값을 사용
+        prices_clean = prices.drop_duplicates(subset=["date", "ticker"], keep="last")
+        px = prices_clean.pivot(
+            index="date", columns="ticker", values="close"
+        ).sort_index()
+        rets = px.pct_change()
+
+        # 포트폴리오 심볼 추출
+        portfolio_symbols = portfolio_weights["symbol"].tolist()
+        available_symbols = [s for s in portfolio_symbols if s in px.columns]
+
+        if not available_symbols:
+            raise ValueError("No portfolio symbols found in price data")
+
+        logger.info(
+            f"Portfolio symbols: {len(available_symbols)} available out of {len(portfolio_symbols)}"
+        )
+
+        # 포트폴리오 가중치 정규화
+        portfolio_weights_filtered = portfolio_weights[
+            portfolio_weights["symbol"].isin(available_symbols)
+        ].copy()
+        portfolio_weights_filtered["weight"] = (
+            portfolio_weights_filtered["weight"]
+            / portfolio_weights_filtered["weight"].sum()
+        )
+
+        # 리밸런싱 날짜 생성
+        if rebalance_frequency == "quarterly":
+            rebalance_dates = pd.date_range(
+                start=prices["date"].min(), end=prices["date"].max(), freq="Q"
+            )
+        elif rebalance_frequency == "monthly":
+            rebalance_dates = pd.date_range(
+                start=prices["date"].min(), end=prices["date"].max(), freq="M"
+            )
+        elif rebalance_frequency == "weekly":
+            rebalance_dates = pd.date_range(
+                start=prices["date"].min(), end=prices["date"].max(), freq="W"
+            )
+        else:  # daily
+            rebalance_dates = px.index
+
+        # 백테스트 실행
+        equity_curve = []
+        trades_list = []
+        current_weights = portfolio_weights_filtered.set_index("symbol")["weight"]
+
+        for i, date in enumerate(px.index):
+            if i == 0:
+                # 초기 포트폴리오
+                equity_curve.append(
+                    {"date": date, "portfolio_value": 1.0, "daily_return": 0.0}
+                )
+                continue
+
+            # 리밸런싱 체크
+            if date in rebalance_dates:
+                # 거래 비용 적용
+                trade_cost = transaction_costs
+                current_weights = current_weights * (1 - trade_cost)
+
+                # 거래 내역 기록
+                for symbol, weight in current_weights.items():
+                    trades_list.append(
+                        {
+                            "date": date,
+                            "symbol": symbol,
+                            "action": "rebalance",
+                            "weight": weight,
+                            "cost": weight * trade_cost,
+                        }
+                    )
+
+            # 일일 수익률 계산
+            if date in rets.index:
+                daily_rets = rets.loc[date]
+                portfolio_ret = (current_weights * daily_rets).sum()
+
+                # 포트폴리오 가중치 업데이트 (가격 변동 반영)
+                price_changes = 1 + daily_rets
+                current_weights = current_weights * price_changes
+                current_weights = current_weights / current_weights.sum()
+            else:
+                portfolio_ret = 0.0
+
+            # 누적 수익률 계산
+            if i > 0:
+                prev_value = equity_curve[-1]["portfolio_value"]
+                current_value = prev_value * (1 + portfolio_ret)
+            else:
+                current_value = 1.0
+
+            equity_curve.append(
+                {
+                    "date": date,
+                    "portfolio_value": current_value,
+                    "daily_return": portfolio_ret,
+                }
+            )
+
+        # 결과 DataFrame 생성
+        equity_df = pd.DataFrame(equity_curve)
+        equity_df["date"] = pd.to_datetime(equity_df["date"])
+        equity_df.set_index("date", inplace=True)
+
+        trades_df = (
+            pd.DataFrame(trades_list)
+            if trades_list
+            else pd.DataFrame(columns=["date", "symbol", "action", "weight", "cost"])
+        )
+
+        # 성과 지표 계산
+        total_return = equity_df["portfolio_value"].iloc[-1] - 1
+        annual_return = (1 + total_return) ** (252 / len(equity_df)) - 1
+        volatility = equity_df["daily_return"].std() * np.sqrt(252)
+        sharpe_ratio = annual_return / volatility if volatility > 0 else 0
+
+        # 최대 낙폭 계산
+        rolling_max = equity_df["portfolio_value"].expanding().max()
+        drawdown = (equity_df["portfolio_value"] - rolling_max) / rolling_max
+        max_drawdown = drawdown.min()
+
+        # 승률 계산
+        positive_days = (equity_df["daily_return"] > 0).sum()
+        total_days = len(equity_df)
+        win_rate = positive_days / total_days if total_days > 0 else 0
+
+        metrics = {
+            "total_return": total_return,
+            "annualized_return": annual_return,
+            "volatility": volatility,
+            "sharpe_ratio": sharpe_ratio,
+            "max_drawdown": max_drawdown,
+            "win_rate": win_rate,
+        }
+
+        logger.info(
+            f"Backtest metrics - Total Return: {total_return:.2%}, Sharpe: {sharpe_ratio:.3f}"
+        )
+
+        return equity_df, trades_df, metrics
+
+    except Exception as e:
+        logger.error(f"Portfolio backtest failed: {e}")
         raise

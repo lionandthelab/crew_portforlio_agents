@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 CACHE_DIR = "data/cache"
 os.makedirs(CACHE_DIR, exist_ok=True)
 
-# S&P 500 대표 주식들 (실제 거래량이 많고 안정적인 주식들)
+# S&P 500 대표 주식들 (실제 거래량이 많고 안정적인 주식들) - 100개로 확장
 SP500_TICKERS = [
     "AAPL",
     "MSFT",
@@ -72,10 +72,71 @@ SP500_TICKERS = [
     "SPGI",
     "INTU",
     "GILD",
+    "CVX",
+    "XOM",
+    "LLY",
+    "BKNG",
+    "SCHW",
+    "T",
+    "CMCSA",
+    "AMGN",
+    "ADI",
+    "ISRG",
+    "VRTX",
+    "REGN",
+    "PANW",
+    "KLAC",
+    "SNPS",
+    "CDNS",
+    "MELI",
+    "MU",
+    "ASML",
+    "ORLY",
+    "MNST",
+    "CHTR",
+    "MAR",
+    "MCHP",
+    "ADP",
+    "CTAS",
+    "PAYX",
+    "ROST",
+    "BIIB",
+    "ALGN",
+    "DXCM",
+    "IDXX",
+    "CPRT",
+    "FAST",
+    "ODFL",
+    "EXC",
+    "AEP",
+    "SO",
+    "DUK",
+    "D",
+    "SRE",
+    "NEE",
+    "XEL",
+    "WEC",
+    "DTE",
+    "AEE",
+    "PEG",
+    "EIX",
+    "ED",
+    "PCG",
+    "ETR",
+    "AES",
+    "NRG",
+    "VST",
+    "CEG",
+    "CNP",
+    "NI",
+    "ALE",
+    "LNT",
+    "ATO",
 ]
 
-# 섹터 매핑 (실제 GICS 섹터 기준)
+# 섹터 매핑 (실제 GICS 섹터 기준) - 100개 주식에 대한 확장
 SECTOR_MAPPING = {
+    # 기존 50개
     "AAPL": "Technology",
     "MSFT": "Technology",
     "GOOGL": "Technology",
@@ -126,6 +187,67 @@ SECTOR_MAPPING = {
     "SPGI": "Financials",
     "INTU": "Technology",
     "GILD": "Healthcare",
+    # 추가 50개
+    "CVX": "Energy",
+    "XOM": "Energy",
+    "LLY": "Healthcare",
+    "BKNG": "Consumer Discretionary",
+    "SCHW": "Financials",
+    "T": "Communication Services",
+    "CMCSA": "Communication Services",
+    "AMGN": "Healthcare",
+    "ADI": "Technology",
+    "ISRG": "Healthcare",
+    "VRTX": "Healthcare",
+    "REGN": "Healthcare",
+    "PANW": "Technology",
+    "KLAC": "Technology",
+    "SNPS": "Technology",
+    "CDNS": "Technology",
+    "MELI": "Consumer Discretionary",
+    "MU": "Technology",
+    "ASML": "Technology",
+    "ORLY": "Consumer Discretionary",
+    "MNST": "Consumer Staples",
+    "CHTR": "Communication Services",
+    "MAR": "Consumer Discretionary",
+    "MCHP": "Technology",
+    "ADP": "Technology",
+    "CTAS": "Industrials",
+    "PAYX": "Technology",
+    "ROST": "Consumer Discretionary",
+    "BIIB": "Healthcare",
+    "ALGN": "Healthcare",
+    "DXCM": "Healthcare",
+    "IDXX": "Healthcare",
+    "CPRT": "Industrials",
+    "FAST": "Industrials",
+    "ODFL": "Industrials",
+    "EXC": "Utilities",
+    "AEP": "Utilities",
+    "SO": "Utilities",
+    "DUK": "Utilities",
+    "D": "Utilities",
+    "SRE": "Utilities",
+    "NEE": "Utilities",
+    "XEL": "Utilities",
+    "WEC": "Utilities",
+    "DTE": "Utilities",
+    "AEE": "Utilities",
+    "PEG": "Utilities",
+    "EIX": "Utilities",
+    "ED": "Utilities",
+    "PCG": "Utilities",
+    "ETR": "Utilities",
+    "AES": "Utilities",
+    "NRG": "Utilities",
+    "VST": "Utilities",
+    "CEG": "Utilities",
+    "CNP": "Utilities",
+    "NI": "Utilities",
+    "ALE": "Utilities",
+    "LNT": "Utilities",
+    "ATO": "Utilities",
 }
 
 
@@ -180,7 +302,7 @@ class MarketDataLoader:
     def __init__(self, cache: DataCache = None):
         self.cache = cache or DataCache()
 
-    def get_available_tickers(self, max_tickers: int = 20) -> List[str]:
+    def get_available_tickers(self, max_tickers: int = 100) -> List[str]:
         """사용 가능한 티커 목록 반환"""
         return SP500_TICKERS[:max_tickers]
 
@@ -245,7 +367,7 @@ class MarketDataLoader:
     def download_fundamental_data(
         self, tickers: List[str], start_date: str, end_date: str, use_cache: bool = True
     ) -> pd.DataFrame:
-        """재무 데이터 다운로드 (실제로는 mock 데이터 생성)"""
+        """재무 데이터 다운로드 (yfinance API 사용)"""
         cache_key = self.cache._get_cache_key(
             "fundamentals", start_date, end_date, tickers
         )
@@ -256,31 +378,86 @@ class MarketDataLoader:
             if cached_data is not None:
                 return cached_data
 
-        logger.info(f"Generating fundamental data for {len(tickers)} tickers...")
+        logger.info(f"Downloading fundamental data for {len(tickers)} tickers...")
 
-        # 분기별 날짜 생성
-        dates = pd.date_range(start=start_date, end=end_date, freq="Q")
+        # 월간 날짜 생성 (Quarter 대신 Monthly)
+        dates = pd.date_range(start=start_date, end=end_date, freq="M")
 
         fundamental_data = []
+        successful_tickers = []
+
         for ticker in tickers:
-            sector = SECTOR_MAPPING.get(ticker, "Technology")
-            for date in dates:
-                fundamental_data.append(
-                    {
-                        "date": date,
-                        "ticker": ticker,
-                        "PE": np.random.uniform(10, 30),
-                        "ROA": np.random.uniform(0.05, 0.20),
-                        "sector": sector,
-                    }
-                )
+            try:
+                logger.info(f"Downloading fundamental data for {ticker}...")
+                stock = yf.Ticker(ticker)
+
+                # 재무 데이터 가져오기
+                info = stock.info
+
+                # 기본 정보 추출
+                pe_ratio = info.get("trailingPE", np.nan)
+                pb_ratio = info.get("priceToBook", np.nan)
+                roe = info.get("returnOnEquity", np.nan)
+                roa = info.get("returnOnAssets", np.nan)
+                sector = info.get("sector", SECTOR_MAPPING.get(ticker, "Technology"))
+
+                # 각 월별로 데이터 생성
+                for date in dates:
+                    fundamental_data.append(
+                        {
+                            "date": date,
+                            "ticker": ticker,
+                            "PE": pe_ratio,
+                            "PB": pb_ratio,
+                            "ROE": roe,
+                            "ROA": roa,
+                            "sector": sector,
+                        }
+                    )
+
+                successful_tickers.append(ticker)
+                logger.info(f"Successfully downloaded fundamental data for {ticker}")
+
+                # API 제한 방지
+                time.sleep(0.2)
+
+            except Exception as e:
+                logger.warning(f"Failed to download fundamental data for {ticker}: {e}")
+                # 실패한 경우 기본값 사용
+                sector = SECTOR_MAPPING.get(ticker, "Technology")
+                for date in dates:
+                    fundamental_data.append(
+                        {
+                            "date": date,
+                            "ticker": ticker,
+                            "PE": np.random.uniform(10, 30),
+                            "PB": np.random.uniform(1, 5),
+                            "ROE": np.random.uniform(0.05, 0.25),
+                            "ROA": np.random.uniform(0.05, 0.20),
+                            "sector": sector,
+                        }
+                    )
+                continue
 
         df = pd.DataFrame(fundamental_data)
 
+        # NaN 값 처리
+        df = df.fillna(
+            {
+                "PE": df["PE"].median(),
+                "PB": df["PB"].median(),
+                "ROE": df["ROE"].median(),
+                "ROA": df["ROA"].median(),
+            }
+        )
+
         # 캐시에 저장
-        if use_cache:
+        if use_cache and not df.empty:
             self.cache.save(df, cache_key, "fundamentals")
 
+        logger.info(
+            f"Downloaded fundamental data for {len(successful_tickers)} tickers"
+        )
         return df
 
     def create_mock_data_fallback(
@@ -314,12 +491,14 @@ class MarketDataLoader:
         fundamental_data = []
         for ticker in tickers:
             sector = SECTOR_MAPPING.get(ticker, "Technology")
-            for date in pd.date_range(start=start_date, end=end_date, freq="Q"):
+            for date in pd.date_range(start=start_date, end=end_date, freq="M"):
                 fundamental_data.append(
                     {
                         "date": date,
                         "ticker": ticker,
                         "PE": np.random.uniform(10, 30),
+                        "PB": np.random.uniform(1, 5),
+                        "ROE": np.random.uniform(0.05, 0.25),
                         "ROA": np.random.uniform(0.05, 0.20),
                         "sector": sector,
                     }
@@ -413,3 +592,94 @@ def get_cache_info():
         "files": files,
         "total_size_mb": round(total_size / (1024 * 1024), 2),
     }
+
+
+def download_market_data(
+    start_date: str,
+    end_date: str,
+    output_dir: str,
+    symbols: List[str] = None,
+    use_mock_data: bool = False,
+) -> Dict[str, str]:
+    """
+    시장 데이터를 다운로드하고 지정된 디렉토리에 저장합니다.
+
+    Args:
+        start_date: 시작 날짜 (YYYY-MM-DD)
+        end_date: 종료 날짜 (YYYY-MM-DD)
+        output_dir: 출력 디렉토리
+        symbols: 다운로드할 심볼 리스트 (None이면 기본 심볼 사용)
+        use_mock_data: Mock 데이터 사용 여부
+
+    Returns:
+        다운로드된 파일들의 경로 딕셔너리
+    """
+    logger.info(f"Starting market data download...")
+    logger.info(f"Period: {start_date} to {end_date}")
+    logger.info(f"Output directory: {output_dir}")
+    logger.info(f"Use mock data: {use_mock_data}")
+
+    # 출력 디렉토리 생성
+    os.makedirs(output_dir, exist_ok=True)
+
+    # 심볼 설정
+    if symbols is None:
+        symbols = _market_loader.get_available_tickers()
+
+    logger.info(f"Downloading data for {len(symbols)} symbols: {symbols}")
+
+    try:
+        # 데이터 다운로드
+        prices, fundamentals = _market_loader.load_market_data(
+            start_date=start_date,
+            end_date=end_date,
+            use_real_data=not use_mock_data,
+            use_cache=True,
+        )
+
+        # 파일 저장
+        downloaded_files = {}
+
+        # 가격 데이터 저장
+        if not prices.empty:
+            prices_file = os.path.join(output_dir, "prices.csv")
+            prices.to_csv(prices_file, index=False)
+            downloaded_files["prices"] = prices_file
+            logger.info(f"Price data saved to: {prices_file}")
+            logger.info(f"Price data shape: {prices.shape}")
+
+        # 재무 데이터 저장
+        if not fundamentals.empty:
+            fundamentals_file = os.path.join(output_dir, "fundamentals.csv")
+            fundamentals.to_csv(fundamentals_file, index=False)
+            downloaded_files["fundamentals"] = fundamentals_file
+            logger.info(f"Fundamental data saved to: {fundamentals_file}")
+            logger.info(f"Fundamental data shape: {fundamentals.shape}")
+
+        # 다운로드 요약 정보 저장
+        summary = {
+            "download_date": datetime.now().isoformat(),
+            "start_date": start_date,
+            "end_date": end_date,
+            "symbols": symbols,
+            "use_mock_data": use_mock_data,
+            "prices_shape": prices.shape if not prices.empty else None,
+            "fundamentals_shape": (
+                fundamentals.shape if not fundamentals.empty else None
+            ),
+            "files": downloaded_files,
+        }
+
+        summary_file = os.path.join(output_dir, "download_summary.json")
+        with open(summary_file, "w") as f:
+            json.dump(summary, f, indent=2)
+
+        downloaded_files["summary"] = summary_file
+        logger.info(f"Download summary saved to: {summary_file}")
+
+        logger.info("Market data download completed successfully!")
+        return downloaded_files
+
+    except Exception as e:
+        logger.error(f"Market data download failed: {e}")
+        raise

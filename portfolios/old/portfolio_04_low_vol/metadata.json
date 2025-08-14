@@ -1,0 +1,26 @@
+{
+  "name": "portfolio_04_low_vol",
+  "type": "low_vol",
+  "objective": "안정적인 수익을 추구",
+  "strategy": "저변동성 주식 중심으로 구성",
+  "composition": "안정적인 기업 위주로 구성",
+  "created_at": "2025-08-12T17:42:15.052922",
+  "parameters": {
+    "max_names": 8,
+    "max_weight_per_name": 0.2,
+    "factors": {
+      "momentum_252d": {
+        "weight": 0.2
+      },
+      "value_pe_inv": {
+        "weight": 0.2
+      },
+      "quality_roa": {
+        "weight": 0.2
+      },
+      "low_vol_63d": {
+        "weight": 0.4
+      }
+    }
+  }
+}
